@@ -23,8 +23,9 @@ Configuring the deployment of a single page app is harder than it should be. Mos
 - Create AWS Bucket & CloudFront distribution & Route 53 record & ACM certificate and configure it
 - Serve gzipped file
 - Invalidate CloudFront after deployment
-- Basic Auth (recommended to avoid search engine indexation)
+- Basic Auth
 - idempotent script
+- attach lambda edge to CloudFront distribution: Basic Auth (recommended to avoid search engine indexation), geolocation etc.
 
 ## Get Started
 
@@ -61,10 +62,29 @@ aws-spa deploy app.example.com/$(git branch | grep * | cut -d ' ' -f2)
 
 - `--wait`: Wait for CloudFront distribution to be deployed & cache invalidation to be completed. If you choose not to wait (default), you won't see site changes as soon as the command ends.
 - `--directory`: The directory where the static files have been generated. It must contain an index.html. Default is `build`.
-- `--credentials`: This option enables basic auth for the full s3 bucket (even if the domainName specifies a path). Credentials must be of the form "username:password". Basic auth is the recommened way to avoid search engine indexation of non-production apps (such as staging).
 - `--cacheInvalidation`: cache invalidation to be done in CloudFront. Default is `*`: all files are invalidated. For a `create-react-app` app you only need to invalidate `/index.html`
 - `--cacheBustedPrefix`: a folder where files are suffixed with a hash (cash busting). Their `cache-control` value is set to `max-age=31536000`. For a `create-react-app` app you can specify `static/`.
 - `--noPrompt`: Disable confirm message that prompts on non CI environments (env CI=true).
+
+### aws-spa deploy-lambda-edge
+
+Attach a lambda edge to an existing CloudFront domain.
+
+#### Positionals
+
+- `url`:
+
+The URL on which the lambda edge will be triggered. For example `app.example.com/*`, `app.example.com/folder/*`, `app.example.com/geolocation.json`.
+
+```bash
+aws-spa deploy-lambda-edge app.example.com/* path/to/lambda/code
+```
+
+#### Options
+
+- `--wait`: Wait for CloudFront distribution to be updateed & cache invalidation to be completed. If you choose not to wait (default), you won't see site changes as soon as the command ends.
+
+Commonly used lambda edges are available in the [lambda-edge-examples](https://github.com/lalalilo/aws-spa/tree/master/docs) folder.
 
 ## Migrate an existing SPA on aws-spa
 
@@ -79,6 +99,8 @@ If a CloudFront distribution with this S3 bucket already exists, the script will
 
 ## IAM
 
+### deploy
+
 - cloudfront:CreateDistribution
 - cloudfront:ListDistributions
 - cloudfront:ListTagsForResource
@@ -88,7 +110,7 @@ If a CloudFront distribution with this S3 bucket already exists, the script will
 
 **TODO**: complete missing policies
 
-### If using simple auth
+### deploy-lambda-edge
 
 - lambda:GetFunction
 - lambda:EnableReplication\*
