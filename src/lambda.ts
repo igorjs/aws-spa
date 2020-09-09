@@ -1,15 +1,38 @@
 import AdmZip from "adm-zip";
-import { logger } from "./logger";
+import { readFileSync } from "fs";
+import md5File from "md5-file";
 import { lambda } from "./aws-services";
 import { getRoleARNForBasicLambdaExectution } from "./iam";
+import { logger } from "./logger";
 
-export const lambdaPrefix = `aws-spa-basic-auth-`;
+export const lambdaPrefix = `aws-spa-`;
 
-export const deploySimpleAuthLambda = async (
+export const deployLambdaEdge = async (
   domainName: string,
-  credentials: string
+  path: string,
+  codePath: string
 ) => {
-  const name = `${lambdaPrefix}${domainName.replace(/\./g, "-")}`;
+  const zippedCode = getZipCode(codePath);
+
+  return _deployLambdaEdge(
+    domainName,
+    path,
+    await md5File(codePath),
+    zippedCode
+  );
+};
+
+export const _deployLambdaEdge = async (
+  domainName: string,
+  path: string,
+  identifier: string,
+  zippedCode: Buffer
+) => {
+  const name = `${lambdaPrefix}${(domainName + "-" + path)
+    .replace(/[\.\/]/g, "-")
+    .replace("*", "all")}`;
+
+  const description = getDescription(identifier);
 
   if (!(await doesFunctionExists(name))) {
     const roleARN = await getRoleARNForBasicLambdaExectution(name);
@@ -18,48 +41,74 @@ export const deploySimpleAuthLambda = async (
     await lambda
       .createFunction({
         Code: {
-          ZipFile: getZippedCode(credentials)
+          ZipFile: zippedCode,
         },
         FunctionName: name,
-        Handler: "simple-auth.handler",
+        Handler: "lambda.handler",
         Role: roleARN,
-        Runtime: "nodejs8.10",
-        Description: getDescription(credentials),
-        Publish: true
+        Runtime: "nodejs12.x",
+        Description: description,
+        Publish: true,
       })
       .promise();
     logger.info(`[Lambda] 👍 lambda created`);
   }
 
-  logger.info(`[Lambda] 🔍 Checking if credentials changed...`);
-  const {
-    FunctionArn,
-    Description,
-    Version
-  } = await lambda.getFunctionConfiguration({ FunctionName: name }).promise();
+  logger.info(`[Lambda] 🔍 Checking if lambda code changed...`);
+  const { FunctionArn, Description } = await lambda
+    .getFunctionConfiguration({ FunctionName: name })
+    .promise();
 
-  if (Description && Description === getDescription(credentials)) {
-    logger.info(`[Lambda] 👍 credentials didn't changed. Everything is fine.`);
-    return `${FunctionArn}:${Version === "$LATEST" ? "1" : Version}`;
+  const { Versions } = await lambda
+    .listVersionsByFunction({ FunctionName: name })
+    .promise();
+
+  if (
+    Description &&
+    Description === description &&
+    Versions &&
+    Versions.length > 0
+  ) {
+    const version = Versions[Versions.length - 1].Version;
+    logger.info(`[Lambda] 👍 Code didn't changed. Everything is fine.`);
+    return `${FunctionArn}:${version === "$LATEST" ? "1" : version}`;
   }
 
-  logger.info(`[Lambda] ✏️ Credentials changed. Updating code...`);
+  logger.info(`[Lambda] ✏️ Code changed. Updating...`);
   const { Version: newVersion } = await lambda
     .updateFunctionCode({
       FunctionName: name,
-      ZipFile: getZippedCode(credentials),
-      Publish: true
+      ZipFile: zippedCode,
+      Publish: true,
     })
     .promise();
   await lambda
     .updateFunctionConfiguration({
       FunctionName: name,
-      Description: getDescription(credentials)
+      Description: description,
     })
     .promise();
 
   logger.info(`[Lambda] 👍 Code updated`);
   return `${FunctionArn}:${newVersion}`;
+};
+
+const getZipCode = (codePath: string) => {
+  const zip = new AdmZip();
+  zip.addFile("lambda.js", Buffer.from(readFileSync(codePath)));
+  return zip.toBuffer();
+};
+
+export const deploySimpleAuthLambda = async (
+  domainName: string,
+  credentials: string
+) => {
+  return _deployLambdaEdge(
+    domainName,
+    "/",
+    credentials,
+    getSimpleAuthZippedCode(credentials)
+  );
 };
 
 const doesFunctionExists = async (functionName: string) => {
@@ -68,7 +117,7 @@ const doesFunctionExists = async (functionName: string) => {
 
     await lambda
       .getFunction({
-        FunctionName: functionName
+        FunctionName: functionName,
       })
       .promise();
 
@@ -83,10 +132,10 @@ const doesFunctionExists = async (functionName: string) => {
   }
 };
 
-export const getDescription = (credentials: string) =>
-  `Deployed by aws-spa to handle simple auth [credentials=${credentials}]`;
+export const getDescription = (identifier: string) =>
+  `Deployed by aws-spa [identifier=${identifier}]`;
 
-const getZippedCode = (credentials: string) => {
+const getSimpleAuthZippedCode = (credentials: string) => {
   const zip = new AdmZip();
   zip.addFile("simple-auth.js", Buffer.from(getLambdaCode(credentials)));
 

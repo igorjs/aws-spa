@@ -1,14 +1,14 @@
 import { cloudfront } from "./aws-services";
-import { awsResolve } from "./test-helper";
 import {
-  findDeployedCloudfrontDistribution,
-  invalidateCloudfrontCache,
-  identifyingTag,
   createCloudFrontDistribution,
-  setSimpleAuthBehavior,
-  getCacheInvalidations
+  findDeployedCloudfrontDistribution,
+  getCacheInvalidations,
+  identifyingTag,
+  invalidateCloudfrontCache,
+  setLambdaEdgeBehavior,
 } from "./cloudfront";
 import { lambdaPrefix } from "./lambda";
+import { awsResolve } from "./test-helper";
 
 describe("cloudfront", () => {
   describe("findDeployedCloudfrontDistribution", () => {
@@ -35,11 +35,11 @@ describe("cloudfront", () => {
                 {
                   Id: "GOODBYE",
                   Aliases: {
-                    Items: ["goodbye.example.com"]
-                  }
-                }
-              ]
-            }
+                    Items: ["goodbye.example.com"],
+                  },
+                },
+              ],
+            },
           })
         )
         .mockReturnValueOnce(
@@ -50,19 +50,19 @@ describe("cloudfront", () => {
                   Id: "HELLO",
                   Status: "Deployed",
                   Aliases: {
-                    Items: ["hello.example.com"]
-                  }
-                }
-              ]
-            }
+                    Items: ["hello.example.com"],
+                  },
+                },
+              ],
+            },
           })
         );
 
       listTagsForResourceMock.mockReturnValue(
         awsResolve({
           Tags: {
-            Items: [identifyingTag]
-          }
+            Items: [identifyingTag],
+          },
         })
       );
 
@@ -82,19 +82,19 @@ describe("cloudfront", () => {
                 Id: "HELLO",
                 Status: "In Progress",
                 Aliases: {
-                  Items: ["hello.example.com"]
-                }
-              }
-            ]
-          }
+                  Items: ["hello.example.com"],
+                },
+              },
+            ],
+          },
         })
       );
 
       listTagsForResourceMock.mockReturnValue(
         awsResolve({
           Tags: {
-            Items: [identifyingTag]
-          }
+            Items: [identifyingTag],
+          },
         })
       );
       waitForMock.mockReturnValue(awsResolve());
@@ -137,7 +137,7 @@ describe("cloudfront", () => {
       expect(invalidationParams.DistributionId).toEqual("some-distribution-id");
       expect(invalidationParams.InvalidationBatch.Paths.Items).toEqual([
         "index.html",
-        "static/*"
+        "static/*",
       ]);
     });
 
@@ -195,7 +195,7 @@ describe("cloudfront", () => {
 
       expect(waitForMock).toHaveBeenCalledTimes(1);
       expect(waitForMock).toHaveBeenCalledWith("distributionDeployed", {
-        Id: "distribution-id"
+        Id: "distribution-id",
       });
     });
   });
@@ -218,14 +218,14 @@ describe("cloudfront", () => {
           DistributionConfig: {
             DefaultCacheBehavior: {
               LambdaFunctionAssociations: {
-                Items: []
-              }
-            }
+                Items: [],
+              },
+            },
           },
-          ETag: ""
+          ETag: "",
         })
       );
-      await setSimpleAuthBehavior("distribution-id", null);
+      await setLambdaEdgeBehavior("distribution-id", null);
       expect(updateDistribution).not.toHaveBeenCalled();
     });
 
@@ -235,15 +235,15 @@ describe("cloudfront", () => {
           DistributionConfig: {
             DefaultCacheBehavior: {
               LambdaFunctionAssociations: {
-                Items: [{ LambdaFunctionARN: `some-arn:${lambdaPrefix}:1` }]
-              }
-            }
+                Items: [{ LambdaFunctionARN: `some-arn:${lambdaPrefix}:1` }],
+              },
+            },
           },
-          ETag: ""
+          ETag: "",
         })
       );
       updateDistribution.mockReturnValueOnce(awsResolve());
-      await setSimpleAuthBehavior("distribution-id", null);
+      await setLambdaEdgeBehavior("distribution-id", null);
       expect(updateDistribution).toHaveBeenCalledTimes(1);
       expect(
         (updateDistribution.mock.calls[0][0] as any).DistributionConfig
@@ -257,14 +257,14 @@ describe("cloudfront", () => {
           DistributionConfig: {
             DefaultCacheBehavior: {
               LambdaFunctionAssociations: {
-                Items: [{ LambdaFunctionARN: `some-arn:${lambdaPrefix}:1` }]
-              }
-            }
+                Items: [{ LambdaFunctionARN: `some-arn:${lambdaPrefix}:1` }],
+              },
+            },
           },
-          ETag: ""
+          ETag: "",
         })
       );
-      await setSimpleAuthBehavior(
+      await setLambdaEdgeBehavior(
         "distribution-id",
         `some-arn:${lambdaPrefix}:1`
       );
@@ -277,15 +277,15 @@ describe("cloudfront", () => {
           DistributionConfig: {
             DefaultCacheBehavior: {
               LambdaFunctionAssociations: {
-                Items: []
-              }
-            }
+                Items: [],
+              },
+            },
           },
-          ETag: ""
+          ETag: "",
         })
       );
       updateDistribution.mockReturnValueOnce(awsResolve());
-      await setSimpleAuthBehavior("distribution-id", "some-arn:1");
+      await setLambdaEdgeBehavior("distribution-id", "some-arn:1");
       expect(updateDistribution).toHaveBeenCalledTimes(1);
       expect(
         (updateDistribution.mock.calls[0][0] as any).DistributionConfig
@@ -294,8 +294,8 @@ describe("cloudfront", () => {
         {
           EventType: "viewer-request",
           IncludeBody: false,
-          LambdaFunctionARN: "some-arn:1"
-        }
+          LambdaFunctionARN: "some-arn:1",
+        },
       ]);
     });
   });
@@ -307,13 +307,13 @@ describe("cloudfront", () => {
       {
         input: "index.html, hello.html",
         subFolder: undefined,
-        expectedOutput: "/index.html,/hello.html"
+        expectedOutput: "/index.html,/hello.html",
       },
       {
         input: "index.html",
         subFolder: "some-branch",
-        expectedOutput: "/some-branch/index.html"
-      }
+        expectedOutput: "/some-branch/index.html",
+      },
     ])("add missing slash", ({ input, subFolder, expectedOutput }) => {
       expect(getCacheInvalidations(input, subFolder)).toEqual(expectedOutput);
     });

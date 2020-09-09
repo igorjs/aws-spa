@@ -4,16 +4,13 @@ exports.handler = (event, context, callback) => {
     status: "200",
     statusDescription: "OK",
     body: JSON.stringify({
-      country: request.headers["cloudfront-viewer-country"],
-      countryName: request.headers["cloudfront-viewer-country-name"],
-      region: request.headers["cloudfront-viewer-country-region"],
-      regionName: request.headers["cloudfront-viewer-country-region-name"],
-      city: request.headers["cloudfront-viewer-city"],
-      postalCode: request.headers["cloudfront-viewer-postal-code"],
-      timeZone: request.headers["cloudfront-viewer-time-zone"],
-      latitude: request.headers["cloudfront-viewer-latitude"],
-      longitude: request.headers["cloudfront-viewer-longitude"],
-      metroCode: request.headers["cloudfront-viewer-metro-code"],
+      country: request.headers["cloudfront-viewer-country"][0]["value"],
+      latitude: Number(
+        request.headers["cloudfront-viewer-latitude"][0]["value"]
+      ),
+      longitude: Number(
+        request.headers["cloudfront-viewer-longitude"][0]["value"]
+      ),
     }),
     headers: {
       "content-type": [

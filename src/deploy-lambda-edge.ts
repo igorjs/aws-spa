@@ -2,10 +2,12 @@ import { existsSync } from "fs";
 import {
   DistributionIdentificationDetail,
   findDeployedCloudfrontDistribution,
+  setLambdaEdgeBehavior,
 } from "./cloudfront";
+import { deployLambdaEdge } from "./lambda";
 import { logger } from "./logger";
 
-export const deployLambdaEdge = async (url: string, codePath: string) => {
+export const attachLambdaEdge = async (url: string, codePath: string) => {
   const [domainName, path] = url.split("/");
 
   logger.info(
@@ -27,13 +29,6 @@ export const deployLambdaEdge = async (url: string, codePath: string) => {
     );
   }
 
-  // if (credentials) {
-  //   const simpleAuthLambdaARN = await deploySimpleAuthLambda(
-  //     domainName,
-  //     credentials
-  //   );
-  //   await setSimpleAuthBehavior(distribution.Id, simpleAuthLambdaARN);
-  // } else {
-  //   await setSimpleAuthBehavior(distribution.Id, null);
-  // }
+  const lambdaEdgeARN = await deployLambdaEdge(domainName, path, codePath);
+  await setLambdaEdgeBehavior(domainName, distribution.Id, lambdaEdgeARN, path);
 };

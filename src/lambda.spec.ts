@@ -1,6 +1,6 @@
-import { deploySimpleAuthLambda, getDescription } from "./lambda";
-import * as iam from "./iam";
 import { lambda } from "./aws-services";
+import * as iam from "./iam";
+import { deploySimpleAuthLambda, getDescription } from "./lambda";
 import { awsReject, awsResolve } from "./test-helper";
 
 describe("lambda", () => {
@@ -34,7 +34,7 @@ describe("lambda", () => {
         awsResolve({
           FunctionArn: "some-arn",
           Description: getDescription("hello:hello"),
-          Version: "1"
+          Version: "1",
         })
       );
       expect(
@@ -48,7 +48,7 @@ describe("lambda", () => {
         awsResolve({
           FunctionArn: "some-arn",
           Description: getDescription("hello:hello"),
-          Version: "1"
+          Version: "1",
         })
       );
       createFunction.mockReturnValueOnce(awsResolve());
@@ -65,7 +65,7 @@ describe("lambda", () => {
         awsResolve({
           FunctionArn: "some-arn",
           Description: getDescription("hello:hello"),
-          Version: "1"
+          Version: "1",
         })
       );
       createFunction.mockReturnValueOnce(awsResolve());

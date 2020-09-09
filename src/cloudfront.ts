@@ -1,13 +1,11 @@
-import { cloudfront, bucketRegion, websiteEndpoint } from "./aws-services";
-import { getAll } from "./aws-helper";
-import { logger } from "./logger";
 import {
-  DistributionSummary,
   DistributionConfig,
+  DistributionSummary,
   Tag,
-  LambdaFunctionAssociationList
 } from "aws-sdk/clients/cloudfront";
-import { lambdaPrefix } from "./lambda";
+import { getAll } from "./aws-helper";
+import { bucketRegion, cloudfront, websiteEndpoint } from "./aws-services";
+import { logger } from "./logger";
 
 export interface DistributionIdentificationDetail {
   Id: string;
@@ -26,7 +24,7 @@ export const findDeployedCloudfrontDistribution = async (
 
       const { DistributionList } = await cloudfront
         .listDistributions({
-          Marker: nextMarker
+          Marker: nextMarker,
         })
         .promise();
 
@@ -36,12 +34,12 @@ export const findDeployedCloudfrontDistribution = async (
 
       return {
         items: DistributionList.Items || [],
-        nextMarker: DistributionList.NextMarker
+        nextMarker: DistributionList.NextMarker,
       };
     }
   );
 
-  const distribution = distributions.find(_distribution =>
+  const distribution = distributions.find((_distribution) =>
     Boolean(
       _distribution.Aliases.Items &&
         _distribution.Aliases.Items.includes(domainName)
@@ -60,7 +58,7 @@ export const findDeployedCloudfrontDistribution = async (
     !Tags ||
     !Tags.Items ||
     !Tags.Items.find(
-      tag =>
+      (tag) =>
         tag.Key === identifyingTag.Key && tag.Value === identifyingTag.Value
     )
   ) {
@@ -92,8 +90,8 @@ export const tagCloudFrontDistribution = async (
     .tagResource({
       Resource: distribution.ARN,
       Tags: {
-        Items: [identifyingTag]
-      }
+        Items: [identifyingTag],
+      },
     })
     .promise();
 };
@@ -110,7 +108,7 @@ export const createCloudFrontDistribution = async (
 
   const { Distribution } = await cloudfront
     .createDistribution({
-      DistributionConfig: getDistributionConfig(domainName, sslCertificateARN)
+      DistributionConfig: getDistributionConfig(domainName, sslCertificateARN),
     })
     .promise();
 
@@ -136,7 +134,7 @@ const getDistributionConfig = (
   CallerReference: Date.now().toString(),
   Aliases: {
     Quantity: 1,
-    Items: [domainName]
+    Items: [domainName],
   },
   Origins: {
     Quantity: 1,
@@ -150,18 +148,18 @@ const getDistributionConfig = (
           OriginProtocolPolicy: "http-only",
           OriginSslProtocols: {
             Quantity: 1,
-            Items: ["TLSv1"]
+            Items: ["TLSv1"],
           },
           OriginReadTimeout: 30,
-          OriginKeepaliveTimeout: 5
+          OriginKeepaliveTimeout: 5,
         },
         CustomHeaders: {
           Quantity: 0,
-          Items: []
+          Items: [],
         },
-        OriginPath: ""
-      }
-    ]
+        OriginPath: "",
+      },
+    ],
   },
   Enabled: true,
   Comment: "",
@@ -170,69 +168,30 @@ const getDistributionConfig = (
     Enabled: false,
     IncludeCookies: false,
     Bucket: "",
-    Prefix: ""
+    Prefix: "",
   },
   CacheBehaviors: {
-    Quantity: 0
+    Quantity: 0,
   },
   CustomErrorResponses: {
-    Quantity: 0
+    Quantity: 0,
   },
   Restrictions: {
     GeoRestriction: {
       RestrictionType: "none",
-      Quantity: 0
-    }
+      Quantity: 0,
+    },
   },
   DefaultRootObject: "index.html",
   WebACLId: "",
   HttpVersion: "http2",
-  DefaultCacheBehavior: {
-    ViewerProtocolPolicy: "redirect-to-https",
-    TargetOriginId: getOriginId(domainName),
-    ForwardedValues: {
-      QueryString: false,
-      Cookies: {
-        Forward: "none"
-      },
-      Headers: {
-        Quantity: 0,
-        Items: []
-      },
-      QueryStringCacheKeys: {
-        Quantity: 0,
-        Items: []
-      }
-    },
-    AllowedMethods: {
-      Quantity: 2,
-      Items: ["HEAD", "GET"],
-      CachedMethods: {
-        Quantity: 2,
-        Items: ["HEAD", "GET"]
-      }
-    },
-    TrustedSigners: {
-      Enabled: false,
-      Quantity: 0
-    },
-    MinTTL: 0,
-    DefaultTTL: 86400,
-    MaxTTL: 31536000,
-    FieldLevelEncryptionId: "",
-    LambdaFunctionAssociations: {
-      Quantity: 0,
-      Items: []
-    },
-    SmoothStreaming: false,
-    Compress: true // this is required to deliver gzip data
-  },
+  DefaultCacheBehavior: getEmptyBehavior(domainName),
   ViewerCertificate: {
     ACMCertificateArn: sslCertificateARN,
     SSLSupportMethod: "sni-only",
     MinimumProtocolVersion: "TLSv1.1_2016",
-    CertificateSource: "acm"
-  }
+    CertificateSource: "acm",
+  },
 });
 
 const getS3DomainName = (domainName: string) =>
@@ -254,9 +213,9 @@ export const invalidateCloudfrontCache = async (
         CallerReference: Date.now().toString(),
         Paths: {
           Quantity: paths.split(",").length,
-          Items: paths.split(",").map(path => path.trim())
-        }
-      }
+          Items: paths.split(",").map((path) => path.trim()),
+        },
+      },
     })
     .promise();
 
@@ -271,7 +230,7 @@ export const invalidateCloudfrontCache = async (
     await cloudfront
       .waitFor("invalidationCompleted", {
         DistributionId: distributionId,
-        Id: Invalidation.Id
+        Id: Invalidation.Id,
       })
       .promise();
   }
@@ -279,71 +238,144 @@ export const invalidateCloudfrontCache = async (
 
 export const identifyingTag: Tag = {
   Key: "managed-by-aws-spa",
-  Value: "v1"
+  Value: "v1",
 };
 
-export const setSimpleAuthBehavior = async (
+export const setLambdaEdgeBehavior = async (
+  domainName: string,
   distributionId: string,
-  lambdaFunctionARN: string | null
+  lambdaFunctionARN: string,
+  path: string
 ) => {
   const { DistributionConfig, ETag } = await cloudfront
     .getDistributionConfig({ Id: distributionId })
     .promise();
 
-  const lambdaConfigs = DistributionConfig!.DefaultCacheBehavior
-    .LambdaFunctionAssociations!.Items!;
+  logger.info(`[CloudFront] 📚 Checking if lambda edge is already setup...`);
 
-  if (lambdaFunctionARN === null) {
-    logger.info(
-      `[CloudFront] 📚 No basic auth configured. Checking if there is a basic auth to remove...`
-    );
-    const updatedLambdaFunctions = lambdaConfigs.filter(
-      config => !config.LambdaFunctionARN.includes(lambdaPrefix)
-    );
+  const newLambdaConfig = {
+    LambdaFunctionARN: lambdaFunctionARN,
+    EventType: "viewer-request",
+    IncludeBody: false,
+  };
 
-    if (updatedLambdaFunctions.length !== lambdaConfigs.length) {
-      logger.info(
-        `[CloudFront] 🗑 Removing lambda function association handling basic auth...`
-      );
+  if (path === "*") {
+    const lambdaConfigs = DistributionConfig!.DefaultCacheBehavior!
+      .LambdaFunctionAssociations!.Items!;
 
-      await updateLambdaFunctionAssociations(
-        distributionId,
-        DistributionConfig!,
-        updatedLambdaFunctions,
-        ETag!
-      );
-      logger.info(`[CloudFront] 👍 Lambda function association removed`);
-    } else {
-      logger.info(`[CloudFront] 👍 No basic auth setup`);
+    if (
+      lambdaConfigs.find(
+        (config) => config.LambdaFunctionARN === lambdaFunctionARN
+      )
+    ) {
+      logger.info(`[CloudFront] 👍 Lambda edge already setup`);
+      return;
     }
+
+    const updatedLambdaConfigs = [
+      ...lambdaConfigs.filter(
+        (config) => config.EventType !== "viewer-request"
+      ),
+      newLambdaConfig,
+    ];
+
+    const updatedConfig = {
+      ...DistributionConfig!,
+      DefaultCacheBehavior: DistributionConfig!.DefaultCacheBehavior && {
+        ...DistributionConfig!.DefaultCacheBehavior,
+        LambdaFunctionAssociations: lambdaConfigs && {
+          Quantity: updatedLambdaConfigs.length,
+          Items: updatedLambdaConfigs,
+        },
+      },
+    };
+
+    logger.info(
+      `[CloudFront] ✏️ Adding lambda edge to default behavior (and replacing "viewer-request" lambda if any)...`
+    );
+    await updateDistribution(distributionId, updatedConfig, ETag);
     return;
   }
 
-  logger.info(`[CloudFront] 📚 Checking if basic auth is already setup...`);
-  console.log(lambdaConfigs, lambdaFunctionARN);
-  if (
-    lambdaConfigs.find(config => config.LambdaFunctionARN === lambdaFunctionARN)
-  ) {
-    logger.info(`[CloudFront] 👍 Basic auth already setup`);
+  const lambdaARNWithoutVersion = lambdaFunctionARN.substr(
+    0,
+    lambdaFunctionARN.lastIndexOf(":")
+  );
+
+  const lambdaBehavior = DistributionConfig!.CacheBehaviors!.Items!.find(
+    (behavior) =>
+      behavior.LambdaFunctionAssociations!.Items!.find(
+        (config) =>
+          config.LambdaFunctionARN.substr(
+            0,
+            config.LambdaFunctionARN.lastIndexOf(":")
+          ) === lambdaARNWithoutVersion
+      )
+  );
+
+  if (lambdaBehavior) {
+    if (
+      lambdaBehavior.LambdaFunctionAssociations!.Items!.find(
+        (config) => config.LambdaFunctionARN === lambdaFunctionARN
+      )
+    ) {
+      logger.info(`[CloudFront] 👍 Lambda edge already setup`);
+      return;
+    }
+
+    const updatedLambdaConfigs = [
+      ...lambdaBehavior.LambdaFunctionAssociations!.Items!.filter(
+        (config) => config.EventType !== "viewer-request"
+      ),
+      newLambdaConfig,
+    ];
+
+    const updatedConfig: DistributionConfig = {
+      ...DistributionConfig!,
+      CacheBehaviors: {
+        ...DistributionConfig!.CacheBehaviors!,
+        Items: [
+          ...DistributionConfig!.CacheBehaviors!.Items!.filter(
+            (behavior) => behavior.PathPattern !== lambdaBehavior.PathPattern
+          ),
+          {
+            ...lambdaBehavior,
+            LambdaFunctionAssociations: {
+              Quantity: updatedLambdaConfigs.length,
+              Items: updatedLambdaConfigs,
+            },
+          },
+        ],
+      },
+    };
+
+    logger.info(
+      `[CloudFront] ✏️ Updating existing behavior for lambda edge...`
+    );
+    await updateDistribution(distributionId, updatedConfig, ETag);
     return;
   }
+
+  const emptyBehavior = getEmptyBehavior(domainName);
+  const newBehavior = {
+    ...emptyBehavior,
+    PathPattern: path,
+    LambdaFunctionAssociations: { Quantity: 1, Items: [newLambdaConfig] },
+  };
+
+  const updatedConfig = {
+    ...DistributionConfig!,
+    CacheBehaviors: {
+      Quantity: DistributionConfig!.CacheBehaviors!.Quantity + 1,
+      Items: [...DistributionConfig!.CacheBehaviors!.Items!, newBehavior],
+    },
+  };
 
   logger.info(
-    `[CloudFront] ✏️ Adding simple auth behavior (and replacing "viewer-request" lambda if any)...`
+    `[CloudFront] ✏️ Creating behavior for lambda edge (and replacing "viewer-request" lambda if any)...`
   );
-  await updateLambdaFunctionAssociations(
-    distributionId,
-    DistributionConfig!,
-    [
-      ...lambdaConfigs.filter(config => config.EventType !== "viewer-request"),
-      {
-        LambdaFunctionARN: lambdaFunctionARN,
-        EventType: "viewer-request",
-        IncludeBody: false
-      }
-    ],
-    ETag!
-  );
+  await updateDistribution(distributionId, updatedConfig, ETag);
+  return;
 };
 
 export const getCacheInvalidations = (
@@ -352,30 +384,112 @@ export const getCacheInvalidations = (
 ) =>
   cacheInvalidations
     .split(",")
-    .map(string => string.trim().replace(/^\//, ""))
-    .map(string => (subFolder ? `/${subFolder}/${string}` : `/${string}`))
+    .map((string) => string.trim().replace(/^\//, ""))
+    .map((string) => (subFolder ? `/${subFolder}/${string}` : `/${string}`))
     .join(",");
 
-const updateLambdaFunctionAssociations = async (
+const updateDistribution = async (
   distributionId: string,
   DistributionConfig: DistributionConfig,
-  lambdaConfigs: LambdaFunctionAssociationList,
-  ETag: string
+  ETag: string | undefined
 ) => {
   await cloudfront
     .updateDistribution({
       Id: distributionId,
       IfMatch: ETag,
-      DistributionConfig: {
-        ...DistributionConfig,
-        DefaultCacheBehavior: {
-          ...DistributionConfig.DefaultCacheBehavior,
-          LambdaFunctionAssociations: {
-            Quantity: lambdaConfigs.length,
-            Items: lambdaConfigs
-          }
-        }
-      }
+      DistributionConfig,
     })
     .promise();
 };
+
+// const removeLambdaEdge = async (
+//   distributionId: string,
+//   distributionConfig: DistributionConfig,
+//   eTag: string
+// ) => {
+//   logger.info(
+//     `[CloudFront] 📚 No lambda edge configured. Checking if there is a lambda to remove...`
+//   );
+
+//   const defaultBehaviorLambdaFunctionAssociations = distributionConfig.DefaultCacheBehavior.LambdaFunctionAssociations?.Items?.filter(
+//     (config) => !config.LambdaFunctionARN.includes(lambdaPrefix)
+//   );
+
+//   const cacheBehaviors = distributionConfig.CacheBehaviors?.Items?.filter(
+//     (behavior) =>
+//       !behavior.LambdaFunctionAssociations?.Items?.find((config) =>
+//         config.LambdaFunctionARN.includes(lambdaPrefix)
+//       )
+//   );
+
+//   const updatedConfig: DistributionConfig = {
+//     ...distributionConfig,
+//     DefaultCacheBehavior: {
+//       ...distributionConfig.DefaultCacheBehavior,
+//       LambdaFunctionAssociations: defaultBehaviorLambdaFunctionAssociations && {
+//         Quantity: defaultBehaviorLambdaFunctionAssociations.length,
+//         Items: defaultBehaviorLambdaFunctionAssociations,
+//       },
+//     },
+//     CacheBehaviors: cacheBehaviors && {
+//       Quantity: cacheBehaviors.length,
+//       Items: cacheBehaviors,
+//     },
+//   };
+
+//   if (
+//     cacheBehaviors?.length !== distributionConfig.CacheBehaviors?.Quantity ||
+//     defaultBehaviorLambdaFunctionAssociations?.length !==
+//       distributionConfig.DefaultCacheBehavior.LambdaFunctionAssociations
+//         ?.Quantity
+//   ) {
+//     logger.info(`[CloudFront] 🗑 Removing lambda function association...`);
+
+//     await updateDistribution(distributionId, updatedConfig!, eTag);
+//     logger.info(`[CloudFront] 👍 Lambda function association removed`);
+//   } else {
+//     logger.info(`[CloudFront] 👍 No lambda`);
+//   }
+//   return;
+// };
+
+const getEmptyBehavior = (domainName: string) => ({
+  ViewerProtocolPolicy: "redirect-to-https",
+  TargetOriginId: getOriginId(domainName),
+  ForwardedValues: {
+    QueryString: false,
+    Cookies: {
+      Forward: "none",
+    },
+    Headers: {
+      Quantity: 0,
+      Items: [],
+    },
+    QueryStringCacheKeys: {
+      Quantity: 0,
+      Items: [],
+    },
+  },
+  AllowedMethods: {
+    Quantity: 2,
+    Items: ["HEAD", "GET"],
+    CachedMethods: {
+      Quantity: 2,
+      Items: ["HEAD", "GET"],
+    },
+  },
+  TrustedSigners: {
+    Enabled: false,
+    Quantity: 0,
+  },
+  MinTTL: 0,
+  DefaultTTL: 86400,
+  MaxTTL: 31536000,
+  FieldLevelEncryptionId: "",
+  LambdaFunctionAssociations: {
+    Quantity: 0,
+    Items: [],
+  },
+  SmoothStreaming: false,
+  Compress: true,
+});

@@ -2,7 +2,7 @@
 
 import * as yargs from "yargs";
 import { deploy } from "./deploy";
-import { deployLambdaEdge } from "./deploy-lambda-edge";
+import { attachLambdaEdge } from "./deploy-lambda-edge";
 import { logger } from "./logger";
 
 yargs
@@ -102,7 +102,7 @@ yargs
         throw new Error("codePath must be provided");
       }
       try {
-        await deployLambdaEdge(argv.domainName, argv.codePath);
+        await attachLambdaEdge(argv.domainName, argv.codePath);
         logger.info("✅ done!");
         process.exit(0);
       } catch (error) {

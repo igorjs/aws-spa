@@ -1,31 +1,31 @@
 import { existsSync } from "fs";
+import { createCertificate, getCertificateARN } from "./acm";
 import {
-  doesS3BucketExists,
-  createBucket,
-  syncToS3,
-  setBucketWebsite,
-  setBucketPolicy,
-  confirmBucketManagement,
-  tagBucket
-} from "./s3";
-import { getCertificateARN, createCertificate } from "./acm";
-import {
-  findDeployedCloudfrontDistribution,
   createCloudFrontDistribution,
-  invalidateCloudfrontCache,
   DistributionIdentificationDetail,
-  setSimpleAuthBehavior,
-  getCacheInvalidations
+  findDeployedCloudfrontDistribution,
+  getCacheInvalidations,
+  invalidateCloudfrontCache,
+  setLambdaEdgeBehavior,
 } from "./cloudfront";
-import {
-  findHostedZone,
-  createHostedZone,
-  updateRecord,
-  needsUpdateRecord
-} from "./route53";
-import { logger } from "./logger";
 import { deploySimpleAuthLambda } from "./lambda";
+import { logger } from "./logger";
 import { predeployPrompt } from "./prompt";
+import {
+  createHostedZone,
+  findHostedZone,
+  needsUpdateRecord,
+  updateRecord,
+} from "./route53";
+import {
+  confirmBucketManagement,
+  createBucket,
+  doesS3BucketExists,
+  setBucketPolicy,
+  setBucketWebsite,
+  syncToS3,
+  tagBucket,
+} from "./s3";
 
 export const deploy = async (
   url: string,
@@ -41,8 +41,9 @@ export const deploy = async (
   const [domainName, s3Folder] = url.split("/");
 
   logger.info(
-    `✨ Deploying "${folder}" on "${domainName}" with path "${s3Folder ||
-      "/"}"...`
+    `✨ Deploying "${folder}" on "${domainName}" with path "${
+      s3Folder || "/"
+    }"...`
   );
 
   if (!existsSync(folder)) {
@@ -59,7 +60,7 @@ export const deploy = async (
 
     // without this timeout `setBucketPolicy` fails with error
     // "The specified bucket does not exist"
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise((resolve) => setTimeout(resolve, 2000));
   }
   await tagBucket(domainName);
   await setBucketWebsite(domainName);
@@ -90,9 +91,12 @@ export const deploy = async (
       domainName,
       credentials
     );
-    await setSimpleAuthBehavior(distribution.Id, simpleAuthLambdaARN);
-  } else {
-    await setSimpleAuthBehavior(distribution.Id, null);
+    await setLambdaEdgeBehavior(
+      domainName,
+      distribution.Id,
+      simpleAuthLambdaARN,
+      "/*"
+    );
   }
 
   if (
