@@ -2,11 +2,11 @@ import { S3, ACM, CloudFront, Route53, Lambda, IAM } from "aws-sdk";
 
 // Bucket region must be fixed so that website endpoint is fixe
 // https://docs.aws.amazon.com/fr_fr/general/latest/gr/rande.html#s3_website_region_endpoints
-export const bucketRegion = "eu-west-3";
+export const bucketRegion = process.env.AWS_SPA_BUCKET_REGION || "eu-west-3";
 
 export const s3 = new S3({
   apiVersion: "2006-03-01",
-  region: bucketRegion
+  region: bucketRegion,
 });
 
 export const lambda = new Lambda({ region: "us-east-1" });
@@ -39,5 +39,5 @@ export const websiteEndpoint = {
   "eu-west-2": "s3-website.eu-west-2.amazonaws.com",
   "eu-west-3": "s3-website.eu-west-3.amazonaws.com",
   "eu-north-1": "s3-website.eu-north-1.amazonaws.com",
-  "sa-east-1": "s3-website-sa-east-1.amazonaws.com"
+  "sa-east-1": "s3-website-sa-east-1.amazonaws.com",
 };

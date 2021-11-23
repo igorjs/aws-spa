@@ -66,6 +66,8 @@ aws-spa deploy app.example.com/$(git branch | grep * | cut -d ' ' -f2)
 - `--cacheBustedPrefix`: a folder where files are suffixed with a hash (cash busting). Their `cache-control` value is set to `max-age=31536000`. For a `create-react-app` app you can specify `static/`.
 - `--noPrompt`: Disable confirm message that prompts on non CI environments (env CI=true).
 
+You can control in which region the S3 bucket is thanks to the environment variable `AWS_SPA_BUCKET_REGION`. aws-spa does not handle bucket region change.
+
 ## Migrate an existing SPA on aws-spa
 
 aws-spa is aware of the resources it is managing thanks to tags.
