@@ -26,7 +26,7 @@ describe("IAM", () => {
       getRole.mockReturnValueOnce(awsReject(400, "some message"));
       try {
         await getRoleARNForBasicLambdaExectution("some-role");
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).toEqual("some message");
       }
     });

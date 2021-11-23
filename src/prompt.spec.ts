@@ -27,7 +27,7 @@ describe("prompt", () => {
       promptMock.mockResolvedValue({ continueDeploy: false });
       try {
         await predeployPrompt(false, false);
-      } catch (error) {
+      } catch (error: any) {
         expect(promptMock).toHaveBeenCalled();
       }
     });

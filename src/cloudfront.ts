@@ -5,7 +5,7 @@ import {
   DistributionSummary,
   DistributionConfig,
   Tag,
-  LambdaFunctionAssociationList
+  LambdaFunctionAssociationList,
 } from "aws-sdk/clients/cloudfront";
 import { lambdaPrefix } from "./lambda";
 
@@ -26,7 +26,7 @@ export const findDeployedCloudfrontDistribution = async (
 
       const { DistributionList } = await cloudfront
         .listDistributions({
-          Marker: nextMarker
+          Marker: nextMarker,
         })
         .promise();
 
@@ -36,12 +36,12 @@ export const findDeployedCloudfrontDistribution = async (
 
       return {
         items: DistributionList.Items || [],
-        nextMarker: DistributionList.NextMarker
+        nextMarker: DistributionList.NextMarker,
       };
     }
   );
 
-  const distribution = distributions.find(_distribution =>
+  const distribution = distributions.find((_distribution) =>
     Boolean(
       _distribution.Aliases.Items &&
         _distribution.Aliases.Items.includes(domainName)
@@ -60,7 +60,7 @@ export const findDeployedCloudfrontDistribution = async (
     !Tags ||
     !Tags.Items ||
     !Tags.Items.find(
-      tag =>
+      (tag) =>
         tag.Key === identifyingTag.Key && tag.Value === identifyingTag.Value
     )
   ) {
@@ -92,8 +92,8 @@ export const tagCloudFrontDistribution = async (
     .tagResource({
       Resource: distribution.ARN,
       Tags: {
-        Items: [identifyingTag]
-      }
+        Items: [identifyingTag],
+      },
     })
     .promise();
 };
@@ -110,7 +110,7 @@ export const createCloudFrontDistribution = async (
 
   const { Distribution } = await cloudfront
     .createDistribution({
-      DistributionConfig: getDistributionConfig(domainName, sslCertificateARN)
+      DistributionConfig: getDistributionConfig(domainName, sslCertificateARN),
     })
     .promise();
 
@@ -136,7 +136,7 @@ const getDistributionConfig = (
   CallerReference: Date.now().toString(),
   Aliases: {
     Quantity: 1,
-    Items: [domainName]
+    Items: [domainName],
   },
   Origins: {
     Quantity: 1,
@@ -150,18 +150,18 @@ const getDistributionConfig = (
           OriginProtocolPolicy: "http-only",
           OriginSslProtocols: {
             Quantity: 1,
-            Items: ["TLSv1"]
+            Items: ["TLSv1"],
           },
           OriginReadTimeout: 30,
-          OriginKeepaliveTimeout: 5
+          OriginKeepaliveTimeout: 5,
         },
         CustomHeaders: {
           Quantity: 0,
-          Items: []
+          Items: [],
         },
-        OriginPath: ""
-      }
-    ]
+        OriginPath: "",
+      },
+    ],
   },
   Enabled: true,
   Comment: "",
@@ -170,19 +170,19 @@ const getDistributionConfig = (
     Enabled: false,
     IncludeCookies: false,
     Bucket: "",
-    Prefix: ""
+    Prefix: "",
   },
   CacheBehaviors: {
-    Quantity: 0
+    Quantity: 0,
   },
   CustomErrorResponses: {
-    Quantity: 0
+    Quantity: 0,
   },
   Restrictions: {
     GeoRestriction: {
       RestrictionType: "none",
-      Quantity: 0
-    }
+      Quantity: 0,
+    },
   },
   DefaultRootObject: "index.html",
   WebACLId: "",
@@ -193,28 +193,28 @@ const getDistributionConfig = (
     ForwardedValues: {
       QueryString: false,
       Cookies: {
-        Forward: "none"
+        Forward: "none",
       },
       Headers: {
         Quantity: 0,
-        Items: []
+        Items: [],
       },
       QueryStringCacheKeys: {
         Quantity: 0,
-        Items: []
-      }
+        Items: [],
+      },
     },
     AllowedMethods: {
       Quantity: 2,
       Items: ["HEAD", "GET"],
       CachedMethods: {
         Quantity: 2,
-        Items: ["HEAD", "GET"]
-      }
+        Items: ["HEAD", "GET"],
+      },
     },
     TrustedSigners: {
       Enabled: false,
-      Quantity: 0
+      Quantity: 0,
     },
     MinTTL: 0,
     DefaultTTL: 86400,
@@ -222,17 +222,17 @@ const getDistributionConfig = (
     FieldLevelEncryptionId: "",
     LambdaFunctionAssociations: {
       Quantity: 0,
-      Items: []
+      Items: [],
     },
     SmoothStreaming: false,
-    Compress: true // this is required to deliver gzip data
+    Compress: true, // this is required to deliver gzip data
   },
   ViewerCertificate: {
     ACMCertificateArn: sslCertificateARN,
     SSLSupportMethod: "sni-only",
     MinimumProtocolVersion: "TLSv1.1_2016",
-    CertificateSource: "acm"
-  }
+    CertificateSource: "acm",
+  },
 });
 
 const getS3DomainName = (domainName: string) =>
@@ -254,9 +254,9 @@ export const invalidateCloudfrontCache = async (
         CallerReference: Date.now().toString(),
         Paths: {
           Quantity: paths.split(",").length,
-          Items: paths.split(",").map(path => path.trim())
-        }
-      }
+          Items: paths.split(",").map((path) => path.trim()),
+        },
+      },
     })
     .promise();
 
@@ -271,7 +271,7 @@ export const invalidateCloudfrontCache = async (
     await cloudfront
       .waitFor("invalidationCompleted", {
         DistributionId: distributionId,
-        Id: Invalidation.Id
+        Id: Invalidation.Id,
       })
       .promise();
   }
@@ -279,7 +279,7 @@ export const invalidateCloudfrontCache = async (
 
 export const identifyingTag: Tag = {
   Key: "managed-by-aws-spa",
-  Value: "v1"
+  Value: "v1",
 };
 
 export const setSimpleAuthBehavior = async (
@@ -290,15 +290,15 @@ export const setSimpleAuthBehavior = async (
     .getDistributionConfig({ Id: distributionId })
     .promise();
 
-  const lambdaConfigs = DistributionConfig!.DefaultCacheBehavior
-    .LambdaFunctionAssociations!.Items!;
+  const lambdaConfigs =
+    DistributionConfig!.DefaultCacheBehavior.LambdaFunctionAssociations!.Items!;
 
   if (lambdaFunctionARN === null) {
     logger.info(
       `[CloudFront] 📚 No basic auth configured. Checking if there is a basic auth to remove...`
     );
     const updatedLambdaFunctions = lambdaConfigs.filter(
-      config => !config.LambdaFunctionARN.includes(lambdaPrefix)
+      (config) => !config.LambdaFunctionARN.includes(lambdaPrefix)
     );
 
     if (updatedLambdaFunctions.length !== lambdaConfigs.length) {
@@ -320,9 +320,10 @@ export const setSimpleAuthBehavior = async (
   }
 
   logger.info(`[CloudFront] 📚 Checking if basic auth is already setup...`);
-  console.log(lambdaConfigs, lambdaFunctionARN);
   if (
-    lambdaConfigs.find(config => config.LambdaFunctionARN === lambdaFunctionARN)
+    lambdaConfigs.find(
+      (config) => config.LambdaFunctionARN === lambdaFunctionARN
+    )
   ) {
     logger.info(`[CloudFront] 👍 Basic auth already setup`);
     return;
@@ -335,12 +336,14 @@ export const setSimpleAuthBehavior = async (
     distributionId,
     DistributionConfig!,
     [
-      ...lambdaConfigs.filter(config => config.EventType !== "viewer-request"),
+      ...lambdaConfigs.filter(
+        (config) => config.EventType !== "viewer-request"
+      ),
       {
         LambdaFunctionARN: lambdaFunctionARN,
         EventType: "viewer-request",
-        IncludeBody: false
-      }
+        IncludeBody: false,
+      },
     ],
     ETag!
   );
@@ -352,8 +355,8 @@ export const getCacheInvalidations = (
 ) =>
   cacheInvalidations
     .split(",")
-    .map(string => string.trim().replace(/^\//, ""))
-    .map(string => (subFolder ? `/${subFolder}/${string}` : `/${string}`))
+    .map((string) => string.trim().replace(/^\//, ""))
+    .map((string) => (subFolder ? `/${subFolder}/${string}` : `/${string}`))
     .join(",");
 
 const updateLambdaFunctionAssociations = async (
@@ -372,10 +375,10 @@ const updateLambdaFunctionAssociations = async (
           ...DistributionConfig.DefaultCacheBehavior,
           LambdaFunctionAssociations: {
             Quantity: lambdaConfigs.length,
-            Items: lambdaConfigs
-          }
-        }
-      }
+            Items: lambdaConfigs,
+          },
+        },
+      },
     })
     .promise();
 };
